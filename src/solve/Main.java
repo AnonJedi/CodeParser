@@ -1,17 +1,31 @@
 package solve;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Main
 {
     public static void main(String []args)
     {
         String []info = ReadInfo();
+        Reader reader;
+        NewFile f = new NewFile();
+        f.Create();
+        Writer writer;
 
-        IO.CreateFile();
-        Process(info[0], Integer.parseInt(info[1]), Integer.parseInt(info[2]));
+        try
+        {
+            BufferedReader fileReader = new BufferedReader(new FileReader(new File(info[0])));
+            reader = new Reader(fileReader);
+            BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(new File("result.txt"), true));
+            writer = new Writer(bufferedWriter);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        Parser.Process(reader, writer, Integer.parseInt(info[1]), Integer.parseInt(info[2]));
+        writer.Close();
     }
 
     private static String[] ReadInfo()  //метод-опросник
@@ -62,33 +76,4 @@ public class Main
         return info;
     }
 
-    private static void Process(String fileName, int spaceSize, int style)    //логика программы
-    {
-        PseudoTuple result = new PseudoTuple(new ArrayList<String>(), 0);
-        result.list.add(" ");
-
-        try
-        {
-            BufferedReader fileReader = new BufferedReader(new FileReader(new File(fileName)));
-
-            while (true)
-            {
-                IO io = new IO();
-                char c = io.Reader(fileReader); //считывает по одному символу за раз
-                result = Parser.Parse(c, result, spaceSize, style); //вставляет этот символ на своё место
-
-                if (result.list.size() > 1)
-                {
-                    IO.Writer(result.list);
-                    result.list = new ArrayList<String>();
-                    result.list.add(" ");
-                }
-            }
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException(e);
-        }
-        catch (IndexOutOfBoundsException e){}   //условие выхода из цикла
-    }
 }

@@ -1,13 +1,23 @@
 package solve;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Parser
 {
-    public static PseudoTuple Parse(char symbol, PseudoTuple result, int spaceSize, int style)
+    private static int spaceCounter = 0;
+    private static char[] memory = {' ', ' ', ' ', ' ', ' '};
+
+    private static char[] MemoryShift(char[] memory, char symbol)
+    {
+        if (memory[0] != '#') memory[0] = memory[1];
+        memory[1] = memory[2];
+        memory[2] = memory[3];
+        memory[3] = symbol;
+
+        return memory;
+    }
+
+    private static String Parse(char symbol, int spaceSize, int style)
     {
         ArrayList<Character> specChar = new ArrayList<Character>(); //символы операций
         specChar.add('*');
@@ -24,168 +34,120 @@ public class Parser
         endString.add('{');
         endString.add('}');
 
-        List<String> buffer = result.list;
-        int counter = result.spaceCounter;
-
-        char []splitString = buffer.get(buffer.size()-1).toCharArray();
-
         StringBuilder stringBuilder = new StringBuilder();
-        int maxIndex = splitString.length - 1;
-        stringBuilder.append(buffer.get(buffer.size()-1));
 
-        if ((symbol == '\n') || (symbol == '\r')) //если код уже отформатирован, не добавлять лишние переносы
-        {
-            symbol = ' ';
-            return result;
-        }
+        if ((symbol == '\n') || (symbol == '\r')) return null;
 
         String space = "";
-        if (splitString.length == 1)
-        {
-            if (symbol == '}') counter--;
 
-            for (int i = 0; i < counter; i++)
+        if (symbol == '{') memory[0] = ' ';
+
+        boolean checkSpace;
+        if (endString.contains(memory[3]) && memory[0] != '#')
+        {
+            if (symbol == '}') spaceCounter--;
+            for (int i = 0; i < spaceCounter; i++)
             {
                 for (int j = 0; j < spaceSize; j++) space += " ";   //размер отступа
             }
             stringBuilder.append(space);
+            checkSpace = true;
         }
+        else checkSpace = false;
 
-        if ((splitString.length <= (counter * spaceSize)) && (symbol == ' '))   //если код уже отформатирован, не вносить лишние отступы
-        {
-            for (char c : splitString)
-            {
-                if (c == ' ') return result;
-            }
-        }
+        if (checkSpace && (symbol == ' ')) return null;   //если код уже отформатирован, не вносить лишние отступы
 
-        Pattern pattern = Pattern.compile(".*#.*"); //определение условий for
-        Matcher matcher = pattern.matcher(buffer.get(buffer.size()-1));
-        if (matcher.find())
+        if ((memory[0] == '#') && (symbol == ';'))
         {
-            if (symbol == ';')
-            {
-                stringBuilder.append("# ");
-                buffer.set(buffer.size()-1, stringBuilder.toString());
-                result.list = buffer;
-                return result;
-            }
+            stringBuilder.append(symbol + " ");
+            MemoryShift(memory, symbol);
+            return stringBuilder.toString();
         }   //конец определения условий for
 
-        if (endString.contains(symbol)) //проверка на конец строки, теперь нормализация здесь
+        if (endString.contains(symbol)) //проверка на конец строки
         {
             if (symbol != '{' || style == 1)
             {
-                stringBuilder.append(symbol);
+                stringBuilder.append(symbol + "\r\n");
+                memory[0] = ' ';
+                MemoryShift(memory, symbol);
+                if (symbol == '{') spaceCounter++;
 
-                splitString = stringBuilder.toString().toCharArray();
-                stringBuilder = new StringBuilder();
-
-                for (int i = 1; i < splitString.length; i++)
-                {
-                    if (splitString[i] == '#')
-                    {
-                        stringBuilder.append(';');
-                        continue;
-                    }
-                    else stringBuilder.append(splitString[i]);
-                }
-                buffer.set(buffer.size() - 1, stringBuilder.toString());
+                return stringBuilder.toString();
             }
             else if (symbol == '{' && style == 2)
             {
-                splitString = stringBuilder.toString().toCharArray();
-                stringBuilder = new StringBuilder();
-
-                for (int i = 1; i < splitString.length; i++)
+                for (int i = 0; i < spaceCounter; i++)
                 {
-                    if (splitString[i] == '#')
-                    {
-                        stringBuilder.append(';');
-                        continue;
-                    }
-                    else stringBuilder.append(splitString[i]);
+                    for (int j = 0; j < spaceSize; j++) space += " ";   //размер отступа
                 }
-                buffer.set(buffer.size() - 1, stringBuilder.toString());
+                stringBuilder.append("\r\n" + space + symbol + "\r\n");
+                spaceCounter++;
+                MemoryShift(memory, symbol);
 
-                for (int i = 0; i < counter; i++)
-                {
-                    for (int j = 0; j < spaceSize; j++) space += " ";
-                }
-                buffer.add(space + String.valueOf(symbol));
+                return stringBuilder.toString();
             }
-
-            buffer.add(" ");
-            result.list = buffer;
-
-            if (symbol == '{') result.spaceCounter++;
-            else if (symbol == '}') result.spaceCounter--;
-
-            return result;
         }
-        else if (((symbol == ' ') || (symbol == '(')) && (maxIndex > 0))    //определение операторов
+        else if ((symbol == ' ') || (symbol == '('))    //определение операторов
         {
-            if ((splitString[maxIndex] == 'f') && (splitString[maxIndex-1] == 'i')) //определение if
+            if ((memory[3] == 'f') && (memory[2] == 'i') && ((memory[1] == ' ') || endString.contains(memory[1]))) //определение if
             {
-                if (maxIndex > 1)
-                {
-                    if (splitString[maxIndex-2] == ' ') stringBuilder.append(" " + symbol);
-                    else stringBuilder.append(symbol);
-                }
+                if (symbol == ' ') stringBuilder.append(symbol);
                 else stringBuilder.append(" " + symbol);
+
+                MemoryShift(memory, symbol);
+                return stringBuilder.toString();
             }
-            else if (maxIndex > 1)
+            else if ((memory[3] == 'r') && (memory[2] == 'o') && (memory[1] == 'f') && ((memory[0] == ' ') || endString.contains(memory[0]))) //определение for
             {
-                if ((splitString[maxIndex] == 'r') && (splitString[maxIndex-1] == 'o') && (splitString[maxIndex-2] == 'f')) //определение for
-                {
-                    if (maxIndex > 2)
-                    {
-                        if (splitString[maxIndex-3] == ' ')
-                        {
-                            splitString[0] = '#';
-                            stringBuilder = new StringBuilder();
-                            for (char c : splitString) stringBuilder.append(String.valueOf(c));
-                            stringBuilder.append(" " + symbol);
-                        }
-                    }
-                    else
-                    {
-                        splitString[0] = '#';
-                        stringBuilder = new StringBuilder();
-                        for (char c : splitString) stringBuilder.append(String.valueOf(c));
-                        stringBuilder.append(" " + symbol);
-                    }
-                }
-                else stringBuilder.append(symbol);
+                memory[0] = '#';
+
+                if (symbol == ' ') stringBuilder.append(symbol);
+                else stringBuilder.append(" " + symbol);
+
+                MemoryShift(memory, symbol);
+                return stringBuilder.toString();
             }
+            else stringBuilder.append(symbol);
+
+            MemoryShift(memory, symbol);
+            return stringBuilder.toString();
         }
         else if (specChar.contains(symbol)) //проверка на символ операции
         {
-            if (maxIndex > 0)
-            {
-                if ((splitString[maxIndex] == '+') && (symbol == '+') || (splitString[maxIndex] == '-') && (symbol == '-')) //++ и -- пишутся без отступов
-                {
-                    splitString[maxIndex-1] = symbol;
-                    stringBuilder = new StringBuilder();
-
-                    for (char c : splitString) stringBuilder.append(String.valueOf(c));
-                    buffer.set(buffer.size()-1, stringBuilder.toString());
-                    result.list = buffer;
-                    return result;
-                }
-                else if (!specChar.contains(splitString[maxIndex])) stringBuilder.append(" " + symbol);
-                else stringBuilder.append(symbol);
-            }
+            if (!specChar.contains(memory[3]) && memory[3] != ' ') stringBuilder.append(" " + symbol);
             else stringBuilder.append(symbol);
+
+            MemoryShift(memory, symbol);
+            return stringBuilder.toString();
         }
         else    //запись обычного символа
         {
-            if (specChar.contains(splitString[maxIndex]) && (symbol != ')')) stringBuilder.append(" " + symbol);
+            if (specChar.contains(memory[3]) && (symbol != ')')) stringBuilder.append(" " + symbol);
             else stringBuilder.append(symbol);
-        }
-        buffer.set(buffer.size()-1, stringBuilder.toString());
-        result.list = buffer;
 
-        return result;
+            MemoryShift(memory, symbol);
+            return stringBuilder.toString();
+        }
+
+        return null;
+    }
+
+    public static void Process(Reader reader, Writer writer, int spaceSize, int style)    //логика программы
+    {
+        while (true)
+        {
+            try
+            {
+                char c = reader.getChar(); //считывает по одному символу за раз
+                String s = Parser.Parse(c, spaceSize, style); //вставляет этот символ на своё место
+                writer.Save(s);
+            }
+            catch (NullPointerException e) {}
+            catch (IndexOutOfBoundsException e) //условие выхода из цикла
+            {
+                break;
+            }
+        }
     }
 }
